@@ -107,7 +107,10 @@ fn read_stat(pid: u32) -> Option<(String, u32, u64)> {
     Some((comm, parent, start))
 }
 
+const KERNEL_COMM_MAX_LEN: usize = 15;
+
 pub fn processes_by_name(name: &str) -> Vec<Process> {
+    let truncated_name = &name[..name.len().min(KERNEL_COMM_MAX_LEN)];
     let Ok(entries) = fs::read_dir("/proc") else {
         return Vec::new();
     };
@@ -116,7 +119,7 @@ pub fn processes_by_name(name: &str) -> Vec<Process> {
         .filter_map(|entry| entry.file_name().to_str()?.parse::<u32>().ok())
         .filter_map(|pid| {
             let (comm, parent, _) = read_stat(pid)?;
-            comm.eq_ignore_ascii_case(name).then_some(Process { pid, parent })
+            comm.eq_ignore_ascii_case(truncated_name).then_some(Process { pid, parent })
         })
         .collect()
 }
