@@ -38,6 +38,32 @@ fn record_check_at(path: &std::path::Path, instant: u128) {
     let _ = std::fs::write(path, format!("{instant}\n"));
 }
 
+fn local_bin_dir() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    Some(std::path::PathBuf::from(home).join(".local/bin"))
+}
+
+fn path_contains(dir: &std::path::Path) -> bool {
+    std::env::var_os("PATH")
+        .map(|path| std::env::split_paths(&path).any(|p| p == dir))
+        .unwrap_or(false)
+}
+
+fn link_into_local_bin(destination: &std::path::Path) -> Result<std::path::PathBuf> {
+    let dir = local_bin_dir().context("HOME não definido")?;
+    std::fs::create_dir_all(&dir).context("criando ~/.local/bin")?;
+    let link = dir.join("ropelato-discord");
+    let _ = std::fs::remove_file(&link);
+    std::os::unix::fs::symlink(destination, &link).context("criando link em ~/.local/bin")?;
+    Ok(link)
+}
+
+fn unlink_from_local_bin() {
+    if let Some(dir) = local_bin_dir() {
+        let _ = std::fs::remove_file(dir.join("ropelato-discord"));
+    }
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let command = args
@@ -129,6 +155,11 @@ fn install(options: InstallOptions) -> Result<()> {
     );
     println!("  PAC        : {}", pac_url());
 
+    match link_into_local_bin(&destination) {
+        Ok(link) => println!("  link       : {}", link.display()),
+        Err(e) => println!("  link       : não consegui criar ({e}); use o caminho completo acima"),
+    }
+
     if options.restart_discord {
         match discord::restart(&pac_url()) {
             Ok(true) => println!("\nDiscord reiniciado. Já está valendo."),
@@ -139,7 +170,22 @@ fn install(options: InstallOptions) -> Result<()> {
         println!("\nFeche e abra o Discord uma vez.");
     }
 
-    println!("\nEm um terminal novo, o comando `ropelato-discord` já funciona sozinho.");
+    match local_bin_dir() {
+        Some(dir) if path_contains(&dir) => {
+            println!("\nEm um terminal novo, o comando `ropelato-discord` já funciona sozinho.");
+        }
+        Some(dir) => {
+            println!(
+                "\n{} não está no seu PATH — adicione (ex.: `fish_add_path {}` no fish, ou \
+                 `export PATH=\"{}:$PATH\"` no bash/zsh) para usar `ropelato-discord` direto. \
+                 Até lá, use o caminho completo do executável acima.",
+                dir.display(),
+                dir.display(),
+                dir.display()
+            );
+        }
+        None => {}
+    }
     Ok(())
 }
 
@@ -148,6 +194,7 @@ fn uninstall(keep_files: bool) -> Result<()> {
     platform::disable_pac().context("desligando a correção")?;
     platform::disable_autostart(&installed_path()).context("removendo o autostart")?;
     terminate_other_instances();
+    unlink_from_local_bin();
 
     let was_open = discord::terminate_if_open();
     if !keep_files {
