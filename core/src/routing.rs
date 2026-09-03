@@ -1,7 +1,5 @@
 use crate::session::Phase;
 
-const DISCORD_DOMAINS: &[&str] = &["discord.com", "discordapp.com", "discord.gg", "latency.discord.media"];
-
 const REGION_DECIDING_HOSTS: &[&str] = &["discord.com", "gateway.discord.gg", "latency.discord.media"];
 
 const STATUS_PAGE: &str = "status.discord.com";
@@ -37,7 +35,7 @@ pub fn decide(host: &str, phase: Phase) -> Route {
     if !valid_hostname(&host) {
         return Route::Direct;
     }
-    if DISCORD_DOMAINS.iter().any(|d| matches(&host, d)) {
+    if decides_region(&host) {
         Route::Foreign
     } else {
         Route::Direct
@@ -77,9 +75,16 @@ mod tests {
     ];
 
     #[test]
-    fn na_abertura_todo_o_discord_sai_por_fora() {
-        for h in FULL_DISCORD {
+    fn na_abertura_so_quem_decide_regiao_sai_por_fora() {
+        for h in ["discord.com", "gateway.discord.gg", "gateway-us-east1-b.discord.gg", "latency.discord.media", "DISCORD.COM."] {
             assert_eq!(decide(h, Phase::Opening), Route::Foreign, "{h}");
+        }
+    }
+
+    #[test]
+    fn cdn_e_status_vao_direto_mesmo_na_abertura() {
+        for h in ["cdn.discordapp.com", "status.discord.com", "discord.gg", "discordapp.com"] {
+            assert_eq!(decide(h, Phase::Opening), Route::Direct, "{h}");
         }
     }
 
