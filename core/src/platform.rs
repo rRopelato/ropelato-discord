@@ -194,8 +194,14 @@ pub fn find_discord() -> Option<PathBuf> {
         .or_else(|| FIXED_PATHS.iter().map(PathBuf::from).find(|p| p.is_file()))
 }
 
-pub fn discord_launcher(pac_url: &str) -> Option<(PathBuf, Vec<String>)> {
-    find_discord().map(|path| (path, vec![format!("--proxy-pac-url={pac_url}")]))
+pub fn discord_launcher(pac_url: Option<&str>) -> Option<(PathBuf, Vec<String>)> {
+    find_discord().map(|path| {
+        let args = match pac_url {
+            Some(url) => vec![format!("--proxy-pac-url={url}")],
+            None => Vec::new(),
+        };
+        (path, args)
+    })
 }
 
 #[cfg(test)]

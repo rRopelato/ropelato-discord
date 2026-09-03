@@ -444,6 +444,8 @@ pub mod log {
     pub fn line(msg: &str) {
         let _guard = lock().lock();
         let path = crate::log_path();
+        let now = chrono::Local::now();
+        let timestamped = format!("[{}:{:03}] {msg}", now.format("%H:%M:%S"), now.timestamp_subsec_millis());
 
         if std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0) > MAX_SIZE {
             let _ = std::fs::write(&path, b"");
@@ -454,8 +456,13 @@ pub mod log {
             .append(true)
             .open(&path)
         {
-            let _ = writeln!(f, "{msg}");
+            let _ = writeln!(f, "{timestamped}");
         }
-        println!("{msg}");
+        println!("{timestamped}");
+    }
+
+    pub fn clear() -> std::io::Result<()> {
+        let _guard = lock().lock();
+        std::fs::write(crate::log_path(), b"")
     }
 }

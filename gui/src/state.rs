@@ -1,4 +1,4 @@
-use ropelato_discord_core::{data_dir, installed_path, log_path, ready_marker_path, last_check_path, discord, platform, pac_url};
+use ropelato_discord_core::{data_dir, installed_path, log_path, ready_marker_path, last_check_path, discord, platform, pac_url, socks};
 use std::{
     fs,
     process::{Command, Stdio},
@@ -110,12 +110,21 @@ pub struct Connection {
     pub host: String,
     pub port: u16,
     pub route: &'static str,
+    pub time: String,
 }
 
 const SERVICE_IMAGE_NAME: &str = "ropelato-discord";
 
 fn service_running() -> bool {
     platform::is_running(SERVICE_IMAGE_NAME)
+}
+
+fn parse_timestamp(text: &str) -> Option<(&str, &str)> {
+    text.strip_prefix('[')?.split_once("] ")
+}
+
+fn strip_timestamp(text: &str) -> &str {
+    parse_timestamp(text).map(|(_, rest)| rest).unwrap_or(text)
 }
 
 fn pool_data() -> (u32, Option<ProxyInUse>) {
@@ -126,7 +135,7 @@ fn pool_data() -> (u32, Option<ProxyInUse>) {
     let mut count = 0;
     let mut proxy = None;
     for line in log.lines().rev() {
-        let text = line.trim();
+        let text = strip_timestamp(line.trim());
         if count == 0 {
             if let Some((number, _)) = text.split_once(" proxies estrangeiros validados") {
                 count = number.trim().parse().unwrap_or(0);
@@ -199,6 +208,7 @@ pub fn connections() -> Vec<Connection> {
         .rev()
         .filter_map(|line| {
             let text = line.trim();
+            let (time, text) = parse_timestamp(text).unwrap_or(("", text));
             let (route, destination) = if let Some(destination) = text.strip_prefix("exterior  ") {
                 ("exterior", destination)
             } else if let Some(destination) = text.strip_prefix("direto    ") {
@@ -212,10 +222,15 @@ pub fn connections() -> Vec<Connection> {
                 host: host.to_string(),
                 port,
                 route,
+                time: time.to_string(),
             })
         })
         .take(20)
         .collect()
+}
+
+pub fn clear_activity() -> Result<(), String> {
+    socks::log::clear().map_err(|e| format!("não consegui limpar o log: {e}"))
 }
 
 pub fn ensure_service() -> Result<(), String> {
@@ -242,14 +257,22 @@ pub fn pause() -> Result<(), String> {
     if !installed_path().exists() {
         return Err("o serviço ainda não está instalado".into());
     }
-    platform::disable_pac().map_err(|e| format!("não consegui pausar a correção: {e}"))
+    platform::disable_pac().map_err(|e| format!("não consegui pausar a correção: {e}"))?;
+    if discord::is_running() {
+        discord::restart(None).map_err(|e| format!("correção pausada, mas não consegui reiniciar o Discord: {e}"))?;
+    }
+    Ok(())
 }
 
 pub fn resume() -> Result<(), String> {
     if !installed_path().exists() {
         return Err("o serviço ainda não está instalado".into());
     }
-    platform::enable_pac().map_err(|e| format!("não consegui retomar a correção: {e}"))
+    platform::enable_pac().map_err(|e| format!("não consegui retomar a correção: {e}"))?;
+    if discord::is_running() {
+        discord::restart(Some(&pac_url())).map_err(|e| format!("correção retomada, mas não consegui reiniciar o Discord: {e}"))?;
+    }
+    Ok(())
 }
 
 pub fn set_autostart(enabled: bool) -> Result<(), String> {
@@ -269,7 +292,8 @@ pub fn restart_discord() -> Result<bool, String> {
     if !service_running() {
         return Err("o serviço precisa estar rodando antes de reiniciar o Discord".into());
     }
-    discord::restart(&pac_url()).map_err(|e| format!("não consegui reiniciar o Discord: {e}"))
+    let url = platform::pac_active().then(|| pac_url());
+    discord::restart(url.as_deref()).map_err(|e| format!("não consegui reiniciar o Discord: {e}"))
 }
 
 pub fn check() -> Result<Status, String> {
@@ -302,10 +326,10 @@ mod tests {
 
     #[test]
     fn extrai_somente_as_rotas_reais_do_log() {
-        let log = "reabastecendo a piscina\n\
-exterior  gateway.discord.gg:443\n\
-direto    cdn.discordapp.com:443\n\
-conexão encerrada: early eof\n";
+        let log = "[10:00:00] reabastecendo a piscina\n\
+[10:00:01] exterior  gateway.discord.gg:443\n\
+[10:00:02] direto    cdn.discordapp.com:443\n\
+[10:00:03] conexão encerrada: early eof\n";
         let dir = tempfile::tempdir().unwrap();
         std::env::set_var("XDG_DATA_HOME", dir.path());
         fs::create_dir_all(log_path().parent().unwrap()).unwrap();
@@ -315,7 +339,9 @@ conexão encerrada: early eof\n";
         assert_eq!(connections.len(), 2);
         assert_eq!(connections[0].host, "cdn.discordapp.com");
         assert_eq!(connections[0].route, "direto");
+        assert_eq!(connections[0].time, "10:00:02");
         assert_eq!(connections[1].host, "gateway.discord.gg");
         assert_eq!(connections[1].route, "exterior");
+        assert_eq!(connections[1].time, "10:00:01");
     }
 }

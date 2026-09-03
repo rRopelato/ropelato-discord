@@ -161,7 +161,7 @@ fn install(options: InstallOptions) -> Result<()> {
     }
 
     if options.restart_discord {
-        match discord::restart(&pac_url()) {
+        match discord::restart(Some(&pac_url())) {
             Ok(true) => println!("\nDiscord reiniciado. Já está valendo."),
             Ok(false) => println!("\nDiscord não encontrado — a correção vale na próxima vez que você abrir."),
             Err(e) => println!("\nNão consegui reiniciar o Discord ({e}). Feche e abra ele uma vez."),
@@ -229,7 +229,8 @@ fn status() -> Result<()> {
 }
 
 fn restart_discord() -> Result<()> {
-    match discord::restart(&pac_url())? {
+    let url = platform::pac_active().then(|| pac_url());
+    match discord::restart(url.as_deref())? {
         true => println!("Discord reiniciado."),
         false => println!("Discord não encontrado."),
     }

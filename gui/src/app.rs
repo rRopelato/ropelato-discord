@@ -144,17 +144,18 @@ fn info_row(ui: &mut egui::Ui, glyph: &str, label: &str, value: impl Into<String
     });
 }
 
-fn primary_button(ui: &mut egui::Ui, glyph: &str, text: &str) -> egui::Response {
+fn primary_button(ui: &mut egui::Ui, glyph: &str, text: &str, tooltip: &str) -> egui::Response {
     ui.add(
         egui::Button::new(
             egui::RichText::new(format!("{glyph} {text}")).color(egui::Color32::from_gray(20)),
         )
         .fill(egui::Color32::from_gray(235)),
     )
+    .on_hover_text(tooltip)
 }
 
-fn secondary_button(ui: &mut egui::Ui, glyph: &str, text: &str) -> egui::Response {
-    ui.button(format!("{glyph} {text}"))
+fn secondary_button(ui: &mut egui::Ui, glyph: &str, text: &str, tooltip: &str) -> egui::Response {
+    ui.button(format!("{glyph} {text}")).on_hover_text(tooltip)
 }
 
 impl eframe::App for App {
@@ -245,16 +246,20 @@ impl eframe::App for App {
             ui.add_space(10.0);
 
             ui.columns(3, |columns| {
-                if primary_button(&mut columns[0], icon::PAPER_PLANE_TILT, "Verificar agora").clicked() {
+                if primary_button(&mut columns[0], icon::PAPER_PLANE_TILT, "Verificar agora", "Verifica o estado do serviço agora, sem esperar a próxima checagem automática").clicked() {
                     let result = state::check().map(|_| ());
                     self.handle_result(result);
                 }
-                if secondary_button(&mut columns[1], icon::ARROW_CLOCKWISE, "Reiniciar Discord").clicked() {
+                if secondary_button(&mut columns[1], icon::ARROW_CLOCKWISE, "Reiniciar Discord", "Fecha e abre o Discord de novo, aplicando a correção na hora").clicked() {
                     let result = state::restart_discord().map(|_| ());
                     self.handle_result(result);
                 }
-                let label = if self.status.fix_enabled { "Pausar" } else { "Retomar" };
-                if secondary_button(&mut columns[2], icon::PAUSE, label).clicked() {
+                let (label, tooltip) = if self.status.fix_enabled {
+                    ("Pausar", "Desliga a correção e reabre o Discord sem o proxy")
+                } else {
+                    ("Retomar", "Liga a correção e reabre o Discord já saindo pelo proxy")
+                };
+                if secondary_button(&mut columns[2], icon::PAUSE, label, tooltip).clicked() {
                     let result = if self.status.fix_enabled { state::pause() } else { state::resume() };
                     self.handle_result(result);
                 }
@@ -262,7 +267,11 @@ impl eframe::App for App {
             ui.add_space(8.0);
 
             let mut autostart = self.status.autostart;
-            if ui.checkbox(&mut autostart, "Iniciar com a sessão").changed() {
+            if ui
+                .checkbox(&mut autostart, "Iniciar com a sessão")
+                .on_hover_text("Sobe o serviço automaticamente sempre que você fizer login")
+                .changed()
+            {
                 let result = state::set_autostart(autostart);
                 self.handle_result(result);
             }
@@ -273,6 +282,17 @@ impl eframe::App for App {
             ui.horizontal(|ui| {
                 ui.colored_label(MUTED, icon::ACTIVITY);
                 ui.strong("Atividade do Discord");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .add(egui::Label::new(egui::RichText::new(icon::TRASH).color(MUTED)).sense(egui::Sense::click()))
+                        .on_hover_text("Limpar o histórico de atividade")
+                        .on_hover_cursor(egui::CursorIcon::PointingHand)
+                        .clicked()
+                    {
+                        let result = state::clear_activity();
+                        self.handle_result(result);
+                    }
+                });
             });
             ui.add_space(4.0);
 
@@ -284,6 +304,7 @@ impl eframe::App for App {
                         ("direto", GREEN)
                     };
                     ui.horizontal(|ui| {
+                        ui.add(egui::Label::new(egui::RichText::new(&connection.time).color(MUTED).small().monospace()));
                         ui.colored_label(dot, "●");
                         ui.add_sized([54.0, 16.0], egui::Label::new(egui::RichText::new(label).small()));
                         ui.monospace(&connection.host);
@@ -305,7 +326,11 @@ impl eframe::App for App {
                     ui.weak(format!("Lista de proxies verificada {}", relative_time(ms)));
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.link("Desinstalar").clicked() {
+                    if ui
+                        .link("Desinstalar")
+                        .on_hover_text("Remove o serviço, a correção e todos os arquivos instalados")
+                        .clicked()
+                    {
                         let _ = state::start_uninstall();
                         std::process::exit(0);
                     }
@@ -321,6 +346,7 @@ impl eframe::App for App {
                     if ui
                         .add(egui::Label::new(egui::RichText::new(icon::GITHUB_LOGO).size(16.0)).sense(egui::Sense::click()))
                         .on_hover_text("Abrir repositório no GitHub")
+                        .on_hover_cursor(egui::CursorIcon::PointingHand)
                         .clicked()
                     {
                         let _ = std::process::Command::new("xdg-open").arg(state::REPOSITORY_URL).spawn();

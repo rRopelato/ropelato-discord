@@ -45,7 +45,7 @@ fn terminate() {
     std::thread::sleep(Duration::from_millis(500));
 }
 
-pub fn restart(pac_url: &str) -> Result<bool> {
+pub fn restart(pac_url: Option<&str>) -> Result<bool> {
     let Some((executable, args)) = platform::discord_launcher(pac_url) else {
         return Ok(false);
     };
