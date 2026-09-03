@@ -1,0 +1,18 @@
+[package]
+name = "ropelato-discord"
+version = "0.1.0"
+edition = "2021"
+description = "Corrige o problema do Discord no Brasil fazendo o handshake sair por um IP estrangeiro (Linux)"
+license = "MIT"
+
+[[bin]]
+name = "ropelato-discord"
+path = "src/main.rs"
+
+[dependencies]
+ropelato-discord-core = { path = "../core" }
+anyhow = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "time", "macros", "sync", "fs"] }
+
+[dev-dependencies]
+tempfile = "3"

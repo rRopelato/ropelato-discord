@@ -1,0 +1,21 @@
+[package]
+name = "ropelato-discord-gui"
+version = "0.1.0"
+edition = "2021"
+description = "Janela de gerenciamento do ropelato-discord (Linux)"
+license = "MIT"
+
+[[bin]]
+name = "ropelato-discord-gui"
+path = "src/main.rs"
+
+[dependencies]
+ropelato-discord-core = { path = "../core" }
+eframe = { version = "0.32", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+tray-icon = "0.21"
+image = { version = "0.25", default-features = false, features = ["png"] }
+gtk = "0.18"
+glib = "0.18"
+
+[dev-dependencies]
+tempfile = "3"

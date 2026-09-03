@@ -1,0 +1,16 @@
+[package]
+name = "ropelato-discord-core"
+version = "0.1.0"
+edition = "2021"
+description = "ropelato-discord"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "time", "macros", "sync", "fs"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "socks", "json"] }
+
+[dev-dependencies]
+tempfile = "3"

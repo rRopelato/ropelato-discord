@@ -1,0 +1,35 @@
+/target
+*.log
+
+# handoff de trabalho, so local
+*.local.md
+
+# planejamento interno das sessoes, nao entra no repositorio
+/docs/superpowers/
+
+# saidas de compilacao e configuracao local de editor
+/dist/
+/.claude/
+
+# instrucoes e configuracao de IA, so local
+/CLAUDE.md
+/AGENTS.md
+/.github/copilot-instructions.md
+
+# instaladores compilados na maquina local
+/*.exe
+
+# variaveis de ambiente e segredos, nunca versionar
+.env
+.env.*
+*.pem
+*.key
+
+# configuracao local de editor/IDE
+/.vscode/
+/.idea/
+*.swp
+
+# lixo de sistema operacional
+.DS_Store
+Thumbs.db
