@@ -84,7 +84,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "parking_lot",
  "percent-encoding",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
  "x11rb",
 ]
 
@@ -620,6 +620,15 @@ dependencies = [
  "profiling",
  "smallvec",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "egui-phosphor"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80049258178b29a9807b15b5bcf3d60722a22a91d03bc9316935dec5ed5ed2e0"
+dependencies = [
+ "egui",
 ]
 
 [[package]]
@@ -2690,6 +2699,7 @@ name = "ropelato-discord-gui"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "egui-phosphor",
  "glib",
  "gtk",
  "image",
@@ -2729,7 +2739,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

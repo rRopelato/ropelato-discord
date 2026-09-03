@@ -1,8 +1,91 @@
-use ropelato_discord_core::{installed_path, log_path, ready_marker_path, last_check_path, discord, platform, pac_url};
+use ropelato_discord_core::{data_dir, installed_path, log_path, ready_marker_path, last_check_path, discord, platform, pac_url};
 use std::{
     fs,
     process::{Command, Stdio},
 };
+
+const APP_ICON: &[u8] = include_bytes!("../icones/icon.png");
+
+pub const REPOSITORY_URL: &str = "https://github.com/rRopelato/ropelato-discord";
+pub const APP_ID: &str = "ropelato-discord-gui";
+
+fn local_bin_dir() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    Some(std::path::PathBuf::from(home).join(".local/bin"))
+}
+
+fn applications_dir() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    Some(std::path::PathBuf::from(home).join(".local/share/applications"))
+}
+
+fn desktop_dir() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    let home = std::path::PathBuf::from(home);
+    let config = fs::read_to_string(home.join(".config/user-dirs.dirs")).ok();
+    let configured = config.as_deref().and_then(|content| {
+        content.lines().find_map(|line| {
+            let value = line.strip_prefix("XDG_DESKTOP_DIR=")?;
+            let value = value.trim_matches('"').replace("$HOME", &home.to_string_lossy());
+            Some(std::path::PathBuf::from(value))
+        })
+    });
+    Some(configured.unwrap_or_else(|| home.join("Desktop")))
+}
+
+fn write_desktop_entry(path: &std::path::Path, content: &str) {
+    let _ = fs::write(path, content);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = fs::metadata(path) {
+            let mut permissions = metadata.permissions();
+            permissions.set_mode(0o755);
+            let _ = fs::set_permissions(path, permissions);
+        }
+    }
+    let _ = Command::new("gio").args(["set", &path.to_string_lossy(), "metadata::trusted", "true"]).output();
+}
+
+pub fn ensure_shortcut() {
+    let Some(bin_dir) = local_bin_dir() else { return };
+    let destination = bin_dir.join("ropelato-discord-gui");
+
+    if let Ok(current) = std::env::current_exe() {
+        if current != destination {
+            let _ = fs::create_dir_all(&bin_dir);
+            let _ = fs::remove_file(&destination);
+            let _ = fs::copy(&current, &destination);
+        }
+    }
+    if !destination.exists() {
+        return;
+    }
+
+    let icon_path = data_dir().join("icone-app.png");
+    if !icon_path.exists() {
+        let _ = fs::create_dir_all(data_dir());
+        let _ = fs::write(&icon_path, APP_ICON);
+    }
+
+    let entry = format!(
+        "[Desktop Entry]\nType=Application\nName=Ropelato Discord\nComment=Corrige a região do Discord no Brasil\nExec=\"{}\"\nIcon={}\nStartupWMClass={}\nTerminal=false\nCategories=Network;Utility;\n",
+        destination.display(),
+        icon_path.display(),
+        APP_ID
+    );
+
+    if let Some(apps_dir) = applications_dir() {
+        let _ = fs::create_dir_all(&apps_dir);
+        write_desktop_entry(&apps_dir.join(format!("{APP_ID}.desktop")), &entry);
+    }
+
+    if let Some(desktop) = desktop_dir() {
+        if desktop.is_dir() {
+            write_desktop_entry(&desktop.join("Ropelato Discord.desktop"), &entry);
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct ProxyInUse {
